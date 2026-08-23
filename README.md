@@ -37,6 +37,20 @@ Mirroring the exchange side, the client stack includes:
 - **Feature Engine** — derives trading signals (e.g. fair value, VWAP, microprice) from the locally maintained order book.
 - **Trading Strategy Framework** — consumes features and market/order updates to drive order placement logic.
 
+## Latency Benchmarking
+
+The full pipeline was instrumented end-to-end with 12 tagged hops (T1–T12, plus a `t`-suffixed order-ack branch) spanning order receipt, matching, and both the market-data and order-acknowledgement fan-out paths. Every stage is timestamped to measure how latency accumulates from order receipt through matching to market-data publish and order acknowledgement.
+
+**Aggregate hop statistics** (24 samples, real `exchange_main` + `trading_main` run): most hops show a P50 in the 0.5–59 µs range, consistent with genuine hot-path cost, while mean/P95 on a few hops (T4→T5, T6→T7, T10→T11, T12→T1) are inflated by two to three orders of magnitude — this reflects generic Linux scheduling delay on non-core-pinned consumer threads rather than compute cost.
+
+![Hop latency statistics](Trading_Ecosystem_Design_Overview/img/benchmark/hop_statistics.png)
+
+**Single-message causal validation** — a controlled single-message run through the same production components, with each hop tag emitted exactly once, giving an exact hop-by-hop breakdown of total order-to-ack and order-to-market-data latency:
+
+![Single-message hop latencies](Trading_Ecosystem_Design_Overview/img/benchmark/hop_latencies.png)
+
+Full methodology, raw data, and engineering takeaways (including what's needed to push this toward production-grade latency — core pinning, kernel bypass, backpressure handling) are documented in [`Low_Latency_CPP_T1_T12_Hop_Report.md`](Trading_Ecosystem_Design_Overview/Low_Latency_CPP_T1_T12_Hop_Report.md).
+
 ## Repository Structure
 
 | Folder | Description |

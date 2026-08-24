@@ -45,10 +45,6 @@ The full pipeline was instrumented end-to-end with 12 tagged hops (T1–T12, plu
 
 ![Hop latency statistics](Trading_Ecosystem_Design_Overview/img/benchmark/hop_statistics.png)
 
-**Single-message causal validation** — a controlled single-message run through the same production components, with each hop tag emitted exactly once, giving an exact hop-by-hop breakdown of total order-to-ack and order-to-market-data latency:
-
-![Single-message hop latencies](Trading_Ecosystem_Design_Overview/img/benchmark/hop_latencies.png)
-
 Full methodology, raw data, and engineering takeaways (including what's needed to push this toward production-grade latency — core pinning, kernel bypass, backpressure handling) are documented in [`Low_Latency_CPP_T1_T12_Hop_Report.md`](Trading_Ecosystem_Design_Overview/Low_Latency_CPP_T1_T12_Hop_Report.md).
 
 ## Repository Structure

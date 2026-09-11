@@ -1,4 +1,4 @@
-# Low_Latency_App_with_CPP
+# Exchange_Client_End_with_Low_Latency
 
 A modern C++ implementation of a full-pipeline, low-latency electronic trading ecosystem. The system is split into an **exchange side** (matching engine, order gateway, market data publisher) and a mirrored **client side** (order gateway client, market data consumer, trading strategy framework), communicating over TCP and UDP multicast.
 
@@ -53,4 +53,4 @@ Full methodology, raw data, and engineering takeaways (including what's needed t
 |---|---|
 | `Exchange_with_Client` | Combined exchange-side and client-side source implementation |
 | `Trading_Ecosystem_Design_Overview` | Architecture diagrams and design notes for the full trading ecosystem |
-| `components_part1` | Early foundational components (data types, IPC, logging/time utilities) |
+| `components_part` | Early foundational components (data types, IPC, logging/time utilities) |

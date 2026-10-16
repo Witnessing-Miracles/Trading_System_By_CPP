@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <atomic>
 
 #include "../../common/thread_utils.h"
 #include "../../common/time_utils.h"
@@ -40,7 +41,7 @@ namespace Trading {
       ASSERT(Common::createAndStartThread(-1, "Trading/TradeEngine", [this] { run(); }) != nullptr, "Failed to start TradeEngine thread.");
     }
 
-    auto stop() -> void {
+    /*auto stop() -> void {
       while(incoming_ogw_responses_->size() || incoming_md_updates_->size()) {
         logger_.log("%:% %() % Sleeping till all updates are consumed ogw-size:% md-size:%\n", __FILE__, __LINE__, __FUNCTION__,
                     Common::getCurrentTimeStr(&time_str_), incoming_ogw_responses_->size(), incoming_md_updates_->size());
@@ -53,7 +54,9 @@ namespace Trading {
                   position_keeper_.toString());
 
       run_ = false;
-    }
+    }*/
+
+	auto stop() -> void;
 
     /// Main loop for this thread - processes incoming client responses and market data updates which in turn may generate client requests.
     auto run() noexcept -> void;
@@ -115,6 +118,9 @@ namespace Trading {
 
     Nanos last_event_time_ = 0;
     volatile bool run_ = false;
+
+	std::atomic<bool> shutdown_requested_{false};
+	std::atomic<bool> shutdown_complete_{false};
 
     std::string time_str_;
     Logger logger_;

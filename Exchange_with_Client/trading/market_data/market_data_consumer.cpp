@@ -21,6 +21,8 @@ namespace Trading {
            "Join failed on:" + std::to_string(incremental_mcast_socket_.socket_fd_) + " error:" + std::string(std::strerror(errno)));
 
     snapshot_mcast_socket_.recv_callback_ = recv_callback;
+	in_recovery_ = true;
+	startSnapshotSync();
   }
 
   /// Main loop for this thread - reads and processes messages from the multicast sockets - the heavy lifting is in the recvCallback() and checkSnapshotSync() methods.

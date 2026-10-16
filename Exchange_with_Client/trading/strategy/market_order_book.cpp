@@ -18,8 +18,8 @@ namespace Trading {
 
   /// Process market data update and update the limit order book.
   auto MarketOrderBook::onMarketUpdate(const Exchange::MEMarketUpdate *market_update) noexcept -> void {
-    const auto bid_updated = (bids_by_price_ && market_update->side_ == Side::BUY && market_update->price_ >= bids_by_price_->price_);
-    const auto ask_updated = (asks_by_price_ && market_update->side_ == Side::SELL && market_update->price_ <= asks_by_price_->price_);
+    auto bid_updated = market_update->side_ == Side::BUY && (!bids_by_price_ || market_update->price_ >= bids_by_price_->price_);
+    auto ask_updated = market_update->side_ == Side::SELL && (!asks_by_price_ || market_update->price_ <= asks_by_price_->price_);
 
     switch (market_update->type_) {
       case Exchange::MarketUpdateType::ADD: {
@@ -67,6 +67,8 @@ namespace Trading {
         }
 
         bids_by_price_ = asks_by_price_ = nullptr;
+	bid_updated = true;
+	ask_updated = true;
       }
         break;
       case Exchange::MarketUpdateType::INVALID:

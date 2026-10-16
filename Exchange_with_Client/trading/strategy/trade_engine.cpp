@@ -41,6 +41,19 @@ namespace Trading {
     }
   }
 
+  auto TradeEngine::stop() -> void {
+    shutdown_requested_.store(true);
+
+    using namespace std::literals::chrono_literals;
+    while (!shutdown_complete_.load()) {
+      std::this_thread::sleep_for(10ms);
+    }
+
+    logger_.log("%:% %() % POSITIONS\n%\n", __FILE__, __LINE__, __FUNCTION__,
+                Common::getCurrentTimeStr(&time_str_), position_keeper_.toString());
+  }
+
+
   TradeEngine::~TradeEngine() {
     run_ = false;
 
@@ -72,28 +85,53 @@ namespace Trading {
 
   /// Main loop for this thread - processes incoming client responses and market data updates which in turn may generate client requests.
   auto TradeEngine::run() noexcept -> void {
-    logger_.log("%:% %() %\n", __FILE__, __LINE__, __FUNCTION__, Common::getCurrentTimeStr(&time_str_));
+    logger_.log("%:% %() %\n", __FILE__, __LINE__, __FUNCTION__,
+                Common::getCurrentTimeStr(&time_str_));
+
     while (run_) {
-      for (auto client_response = incoming_ogw_responses_->getNextToRead(); client_response; client_response = incoming_ogw_responses_->getNextToRead()) {
+      for (auto client_response = incoming_ogw_responses_->getNextToRead();
+           client_response;
+           client_response = incoming_ogw_responses_->getNextToRead()) {
         TTT_MEASURE(T9t_TradeEngine_LFQueue_read, logger_);
 
-        logger_.log("%:% %() % Processing %\n", __FILE__, __LINE__, __FUNCTION__, Common::getCurrentTimeStr(&time_str_),
-                    client_response->toString().c_str());
+        logger_.log("%:% %() % Processing %\n", __FILE__, __LINE__, __FUNCTION__,
+                    Common::getCurrentTimeStr(&time_str_), client_response->toString().c_str());
+
         onOrderUpdate(client_response);
         incoming_ogw_responses_->updateReadIndex();
         last_event_time_ = Common::getCurrentNanos();
       }
 
-      for (auto market_update = incoming_md_updates_->getNextToRead(); market_update; market_update = incoming_md_updates_->getNextToRead()) {
+      for (auto market_update = incoming_md_updates_->getNextToRead();
+           market_update;
+           market_update = incoming_md_updates_->getNextToRead()) {
         TTT_MEASURE(T9_TradeEngine_LFQueue_read, logger_);
 
-        logger_.log("%:% %() % Processing %\n", __FILE__, __LINE__, __FUNCTION__, Common::getCurrentTimeStr(&time_str_),
-                    market_update->toString().c_str());
+        logger_.log("%:% %() % Processing %\n", __FILE__, __LINE__, __FUNCTION__,
+                    Common::getCurrentTimeStr(&time_str_), market_update->toString().c_str());
+
         ASSERT(market_update->ticker_id_ < ticker_order_book_.size(),
                "Unknown ticker-id on update:" + market_update->toString());
+
         ticker_order_book_[market_update->ticker_id_]->onMarketUpdate(market_update);
         incoming_md_updates_->updateReadIndex();
         last_event_time_ = Common::getCurrentNanos();
+      }
+
+      if (shutdown_requested_.load()) {
+        // Repeated calls are safe: cancelAllOrders only sends cancels for LIVE orders.
+        // Orders still PENDING_NEW are canceled on a later pass after their ACCEPTED response.
+        order_manager_.cancelAllOrders();
+
+        if (!order_manager_.hasActiveOrders() &&
+            outgoing_ogw_requests_->size() == 0 &&
+            incoming_ogw_responses_->size() == 0) {
+          logger_.log("%:% %() % All managed orders are inactive; shutdown complete.\n",
+                      __FILE__, __LINE__, __FUNCTION__,
+					  Common::getCurrentTimeStr(&time_str_));
+          shutdown_complete_.store(true);
+          run_ = false;
+        }
       }
     }
   }
@@ -114,9 +152,12 @@ namespace Trading {
     feature_engine_.onOrderBookUpdate(ticker_id, price, side, book);
     END_MEASURE(Trading_FeatureEngine_onOrderBookUpdate, logger_);
 
-    START_MEASURE(Trading_TradeEngine_algoOnOrderBookUpdate_);
-    algoOnOrderBookUpdate_(ticker_id, price, side, book);
-    END_MEASURE(Trading_TradeEngine_algoOnOrderBookUpdate_, logger_);
+    if (!shutdown_requested_.load()) {
+      START_MEASURE(Trading_TradeEngine_algoOnOrderBookUpdate_);
+      algoOnOrderBookUpdate_(ticker_id, price, side, book);
+      END_MEASURE(Trading_TradeEngine_algoOnOrderBookUpdate_, logger_);
+    }
+
   }
 
   /// Process trade events - updates the  feature engine and informs the trading algorithm about the trade event.
@@ -128,9 +169,11 @@ namespace Trading {
     feature_engine_.onTradeUpdate(market_update, book);
     END_MEASURE(Trading_FeatureEngine_onTradeUpdate, logger_);
 
-    START_MEASURE(Trading_TradeEngine_algoOnTradeUpdate_);
-    algoOnTradeUpdate_(market_update, book);
-    END_MEASURE(Trading_TradeEngine_algoOnTradeUpdate_, logger_);
+    if (!shutdown_requested_.load()) {
+      START_MEASURE(Trading_TradeEngine_algoOnTradeUpdate_);
+      algoOnTradeUpdate_(market_update, book);
+      END_MEASURE(Trading_TradeEngine_algoOnTradeUpdate_, logger_);
+    }
   }
 
   /// Process client responses - updates the position keeper and informs the trading algorithm about the response.

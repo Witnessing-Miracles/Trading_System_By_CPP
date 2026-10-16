@@ -4,20 +4,27 @@ namespace Common {
   /// Initialize multicast socket to read from or publish to a stream.
   /// Does not join the multicast stream yet.
   auto McastSocket::init(const std::string &ip, const std::string &iface,
-                       int port, bool is_listening) -> int {
+                         int port, bool is_listening) -> int {
     const SocketCfg socket_cfg{ip, iface, port, true, is_listening, false};
     socket_fd_ = createSocket(logger_, socket_cfg);
     if (socket_fd_ < 0)
       return socket_fd_;
 
     iface_ip_ = getIfaceIP(iface);
-    ASSERT(!iface_ip_.empty(), "Could not determine IPv4 address for interface:" + iface);
+    if (iface_ip_.empty()) {
+      close(socket_fd_);
+      socket_fd_ = -1;
+      return -1;
+    }
 
     if (!is_listening) {
       const in_addr local_iface{inet_addr(iface_ip_.c_str())};
-      ASSERT(setsockopt(socket_fd_, IPPROTO_IP, IP_MULTICAST_IF,
-               &local_iface, sizeof(local_iface)) == 0, "Unable to set multicast interface. error:" +
-               std::string(std::strerror(errno)));
+      if (setsockopt(socket_fd_, IPPROTO_IP, IP_MULTICAST_IF,
+                     &local_iface, sizeof(local_iface)) != 0) {
+        close(socket_fd_);
+        socket_fd_ = -1;
+        return -1;
+      }
     }
 
     return socket_fd_;
@@ -25,8 +32,8 @@ namespace Common {
 
   /// Add / Join membership / subscription to a multicast stream.
   bool McastSocket::join(const std::string &ip) {
-	const ip_mreq mreq{{inet_addr(ip.c_str())}, {inet_addr(iface_ip_.c_str())}};
-	return setsockopt(socket_fd_, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) == 0;
+    const ip_mreq mreq{{inet_addr(ip.c_str())}, {inet_addr(iface_ip_.c_str())}};
+    return setsockopt(socket_fd_, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) == 0;
   }
 
   /// Remove / Leave membership / subscription to a multicast stream.

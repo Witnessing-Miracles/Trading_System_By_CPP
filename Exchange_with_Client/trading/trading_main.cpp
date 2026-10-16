@@ -54,15 +54,15 @@ int main(int argc, char **argv) {
                                           &market_updates);
   trade_engine->start();
 
-  const std::string order_gw_ip = "127.0.0.1";
-  const std::string order_gw_iface = "lo";
+  const std::string order_gw_ip = "192.168.27.128";
+  const std::string order_gw_iface = "ens37";
   const int order_gw_port = 12345;
 
   logger->log("%:% %() % Starting Order Gateway...\n", __FILE__, __LINE__, __FUNCTION__, Common::getCurrentTimeStr(&time_str));
   order_gateway = new Trading::OrderGateway(client_id, &client_requests, &client_responses, order_gw_ip, order_gw_iface, order_gw_port);
   order_gateway->start();
 
-  const std::string mkt_data_iface = "lo";
+  const std::string mkt_data_iface = "ens37";
   const std::string snapshot_ip = "233.252.14.1";
   const int snapshot_port = 20000;
   const std::string incremental_ip = "233.252.14.3";
@@ -119,8 +119,8 @@ int main(int argc, char **argv) {
     std::this_thread::sleep_for(30s);
   }
 
-  trade_engine->stop();
   market_data_consumer->stop();
+  trade_engine->stop();
   order_gateway->stop();
 
   using namespace std::literals::chrono_literals;

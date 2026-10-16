@@ -24,7 +24,32 @@ namespace Trading {
     auto onOrderUpdate(const Exchange::MEClientResponse *client_response) noexcept -> void {
       logger_->log("%:% %() % %\n", __FILE__, __LINE__, __FUNCTION__, Common::getCurrentTimeStr(&time_str_),
                    client_response->toString().c_str());
+
+	  if (client_response->type_ == Exchange::ClientResponseType::CANCEL_REJECTED) {
+        if (client_response->ticker_id_ < ticker_side_order_.size()) {
+          auto &orders = ticker_side_order_.at(client_response->ticker_id_);
+          auto bid_order = &orders.at(sideToIndex(Side::BUY));
+          auto ask_order = &orders.at(sideToIndex(Side::SELL));
+
+          // The exchange rejected the cancel because that client order is no longer present.
+          if (bid_order->order_id_ == client_response->client_order_id_) {
+            bid_order->order_state_ = OMOrderState::DEAD;
+            return;
+          }
+          if (ask_order->order_id_ == client_response->client_order_id_) {
+            ask_order->order_state_ = OMOrderState::DEAD;
+            return;
+          }
+        }
+
+        logger_->log("%:% %() % CANCEL_REJECTED for unknown local order: %\n",
+                     __FILE__, __LINE__, __FUNCTION__, client_response->toString().c_str());
+        return;
+      }
+
       auto order = &(ticker_side_order_.at(client_response->ticker_id_).at(sideToIndex(client_response->side_)));
+
+
       logger_->log("%:% %() % %\n", __FILE__, __LINE__, __FUNCTION__, Common::getCurrentTimeStr(&time_str_),
                    order->toString().c_str());
 
@@ -90,6 +115,32 @@ namespace Trading {
         case OMOrderState::PENDING_CANCEL:
           break;
       }
+    }
+
+	/// Cancel all currently live strategy orders.
+    auto cancelAllOrders() noexcept -> void {
+      for (TickerId ticker_id = 0; ticker_id < ME_MAX_TICKERS; ++ticker_id) {
+        auto bid_order = &(ticker_side_order_.at(ticker_id).at(sideToIndex(Side::BUY)));
+        if (bid_order->order_state_ == OMOrderState::LIVE)
+          cancelOrder(bid_order);
+
+        auto ask_order = &(ticker_side_order_.at(ticker_id).at(sideToIndex(Side::SELL)));
+        if (ask_order->order_state_ == OMOrderState::LIVE)
+          cancelOrder(ask_order);
+      }
+    }
+
+    /// Return true while any order may still be live or awaiting an exchange response.
+    auto hasActiveOrders() const noexcept -> bool {
+      for (const auto &ticker_orders : ticker_side_order_) {
+        for (const auto &order : ticker_orders) {
+          if (order.order_state_ == OMOrderState::LIVE ||
+              order.order_state_ == OMOrderState::PENDING_NEW ||
+              order.order_state_ == OMOrderState::PENDING_CANCEL)
+            return true;
+        }
+      }
+      return false;
     }
 
     /// Have orders of quantity clip at the specified buy and sell prices.

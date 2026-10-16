@@ -35,6 +35,8 @@ namespace Common {
 
     int socket_fd_ = -1;
 
+    std::string iface_ip_;
+
     /// Send and receive buffers, typically only one or the other is needed, not both.
     std::vector<char> outbound_data_;
     size_t next_send_valid_index_ = 0;

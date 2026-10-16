@@ -14,9 +14,6 @@ namespace Exchange {
 
     matching_engine_ = nullptr;
     bids_by_price_ = asks_by_price_ = nullptr;
-    for (auto &itr: cid_oid_to_order_) {
-      itr.fill(nullptr);
-    }
   }
 
   /// Match a new aggressive order with the provided parameters against a passive order held in the bid_itr object and generate client responses and market updates for the match.

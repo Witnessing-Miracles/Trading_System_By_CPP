@@ -117,6 +117,16 @@ namespace Common {
         ASSERT(disableNagle(socket_fd), "disableNagle() failed. errno:" + std::string(strerror(errno)));
       }
 
+	  if (socket_cfg.is_udp_ && !socket_cfg.is_listening_) {
+      const auto iface_ip = getIfaceIP(socket_cfg.iface_);
+      ASSERT(!iface_ip.empty(), "Could not determine IPv4 address for interface:" + socket_cfg.iface_);
+
+      const in_addr local_iface{inet_addr(iface_ip.c_str())};
+      ASSERT(setsockopt(socket_fd, IPPROTO_IP, IP_MULTICAST_IF, &local_iface, sizeof(local_iface)) == 0,
+         "Unable to set multicast interface before connect. error:" + std::string(strerror(errno)));
+	  }
+
+
       if (!socket_cfg.is_listening_) { // establish connection to specified address.
         ASSERT(connect(socket_fd, rp->ai_addr, rp->ai_addrlen) != 1, "connect() failed. errno:" + std::string(strerror(errno)));
       }

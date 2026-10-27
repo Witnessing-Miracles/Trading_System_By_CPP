@@ -6,6 +6,7 @@ static constexpr size_t loop_count = 100000;
 template<typename T>
 size_t benchmarkHashMap(T *order_book, const std::vector<Exchange::MEClientRequest>& client_requests) {
   size_t total_rdtsc = 0;
+  size_t measured_operations = 0;
 
   for (size_t i = 0; i < loop_count; ++i) {
     const auto& client_request = client_requests[i];
@@ -15,6 +16,7 @@ size_t benchmarkHashMap(T *order_book, const std::vector<Exchange::MEClientReque
         order_book->add(client_request.client_id_, client_request.order_id_, client_request.ticker_id_,
                         client_request.side_, client_request.price_, client_request.qty_);
         total_rdtsc += (Common::rdtsc() - start);
+        ++measured_operations;
       }
         break;
 
@@ -22,6 +24,7 @@ size_t benchmarkHashMap(T *order_book, const std::vector<Exchange::MEClientReque
         const auto start = Common::rdtsc();
         order_book->cancel(client_request.client_id_, client_request.order_id_, client_request.ticker_id_);
         total_rdtsc += (Common::rdtsc() - start);
+        ++measured_operations;
       }
         break;
 
@@ -30,7 +33,7 @@ size_t benchmarkHashMap(T *order_book, const std::vector<Exchange::MEClientReque
     }
   }
 
-  return (total_rdtsc / (loop_count * 2));
+  return measured_operations ? total_rdtsc / measured_operations : 0;
 }
 
 int main(int, char **) {

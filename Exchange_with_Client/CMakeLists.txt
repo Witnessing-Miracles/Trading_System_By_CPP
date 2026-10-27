@@ -35,3 +35,8 @@ target_link_libraries(release_benchmark PUBLIC ${LIBS})
 
 add_executable(hash_benchmark benchmarks/hash_benchmark.cpp)
 target_link_libraries(hash_benchmark PUBLIC ${LIBS})
+
+# Isolated price-index A/B microbenchmark; independent of network and queues.
+add_executable(price_level_index_benchmark benchmarks/price_level_index_benchmark.cpp)
+
+add_executable(flat_hash_price_level_benchmark benchmarks/flat_hash_price_level_benchmark.cpp)

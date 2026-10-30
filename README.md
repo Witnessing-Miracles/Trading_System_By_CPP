@@ -4,7 +4,7 @@ A modern C++ implementation of a full-pipeline, low-latency electronic trading e
 
 ## Architecture Overview
 
-![Trading Ecosystem Overview](https://private-us-east-1.manuscdn.com/sessionFile/IgK1A9rOf2Uz1VltnN0bCm/sandbox/qTQ8I9Y8sL12DOE9Jy45oV-images_1793074021092_na1fn_L2hvbWUvdWJ1bnR1L1RyYWRpbmdfU3lzdGVtX0J5X0NQUF9sYXRlc3QvVHJhZGluZ19FY29zeXN0ZW1fRGVzaWduX092ZXJ2aWV3L2ltZy9vcmRlcmJvb2svdHJhZGluZ19lY29zeXN0ZW0.png?Expires=1793246823&Signature=MEUCIQC4-F8f3EdjuovQFU7xc-iykh0LMLR~ljoGq-DcAnkXdgIgJoataqmPdW39hNAYQengItcEoxZSnYHC0l2O8Iec0HM_&Key-Pair-Id=K1K5N5YNBUUMMN)
+![Trading Ecosystem Overview](Trading_Ecosystem_Design_Overview/img/orderbook/trading_ecosystem.png)
 
 The diagram above shows the full trading ecosystem, exchange-side and client-side components together. Since the client-side components mirror their exchange-side counterparts in structure and communication pattern, individual client-side diagrams are omitted below for brevity — see the exchange-side breakdown for the equivalent design.
 
@@ -12,19 +12,19 @@ The diagram above shows the full trading ecosystem, exchange-side and client-sid
 
 ### Trading Exchange (Matching Engine)
 
-![Trading Exchange](https://private-us-east-1.manuscdn.com/sessionFile/IgK1A9rOf2Uz1VltnN0bCm/sandbox/qTQ8I9Y8sL12DOE9Jy45oV-images_1793074021092_na1fn_L2hvbWUvdWJ1bnR1L1RyYWRpbmdfU3lzdGVtX0J5X0NQUF9sYXRlc3QvVHJhZGluZ19FY29zeXN0ZW1fRGVzaWduX092ZXJ2aWV3L2ltZy9leGNoYW5nZV9zaWRlL3RyYWRpbmdfZXhjaGFuZ2U.png?Expires=1793246823&Signature=MEQCIBFwiIoYaLUm4pb4Uuz8E8tEx~wawz~uMmgU28WpHiwyAiBR53FIVn1ykOF3GiSWwV6OzyEjBzWyyJ9fyD4EZqKfkA__&Key-Pair-Id=K1K5N5YNBUUMMN)
+![Trading Exchange](Trading_Ecosystem_Design_Overview/img/exchange_side/trading_exchange.png)
 
 The core of the exchange: a `MatchingEngine` built on a `MEOrderBook` per instrument, using a circular doubly-linked price-level list for O(1) best-bid/ask access. Incoming client orders are sequenced through a `FIFOSequencer` to guarantee deterministic, fair matching order before being applied to the book.
 
 ### Market Data Publisher
 
-![Market Data Publisher](https://private-us-east-1.manuscdn.com/sessionFile/IgK1A9rOf2Uz1VltnN0bCm/sandbox/qTQ8I9Y8sL12DOE9Jy45oV-images_1793074021092_na1fn_L2hvbWUvdWJ1bnR1L1RyYWRpbmdfU3lzdGVtX0J5X0NQUF9sYXRlc3QvVHJhZGluZ19FY29zeXN0ZW1fRGVzaWduX092ZXJ2aWV3L2ltZy9leGNoYW5nZV9zaWRlL21hcmtldF9kYXRhX3B1Ymxpc2hlcg.png?Expires=1793246823&Signature=MEUCIBH4eh8mJBQbosL42B8rKZdoEk-2KYa7RvTPnsfbkEfwAiEApfcOv4-Wie8TnlsO4nCRyaA1xptDbtMu8zfBTARF9F8_&Key-Pair-Id=K1K5N5YNBUUMMN)
+![Market Data Publisher](Trading_Ecosystem_Design_Overview/img/exchange_side/market_data_publisher.png)
 
 Publishes book updates over two parallel UDP multicast streams — an **incremental stream** for real-time order book events, and a **snapshot stream** produced by a `SnapshotSynthesizer` that periodically rebuilds and broadcasts the full book state. Sequence numbers are stamped on every message so downstream consumers can detect gaps and resynchronize.
 
 ### Order Gateway Server
 
-![Order Gateway Server](https://private-us-east-1.manuscdn.com/sessionFile/IgK1A9rOf2Uz1VltnN0bCm/sandbox/qTQ8I9Y8sL12DOE9Jy45oV-images_1793074021092_na1fn_L2hvbWUvdWJ1bnR1L1RyYWRpbmdfU3lzdGVtX0J5X0NQUF9sYXRlc3QvVHJhZGluZ19FY29zeXN0ZW1fRGVzaWduX092ZXJ2aWV3L2ltZy9leGNoYW5nZV9zaWRlL29yZGVyX2dhdGV3YXlfc2VydmVy.png?Expires=1793246823&Signature=MEUCIDJuK25Q9BjpHErajpU-W13SLsePBstxDtMqgtoiLGe1AiEAs2OK1jI69YZF0~1MQoqWfm3L~3ka19u~rAIHtY87K2M_&Key-Pair-Id=K1K5N5YNBUUMMN)
+![Order Gateway Server](Trading_Ecosystem_Design_Overview/img/exchange_side/order_gateway_server.png)
 
 Handles client order flow over TCP: parses inbound receive buffers using `reinterpret_cast`-based binary framing, validates and forwards orders to the matching engine, and streams back execution reports and order acknowledgements to each connected client.
 
@@ -46,7 +46,7 @@ The full pipeline was instrumented end-to-end with 12 tagged hops (T1–T12, plu
 
 **Aggregate hop statistics** (24 samples, real `exchange_main` + `trading_main` run): most hops show a P50 in the 0.5–59 µs range, consistent with genuine hot-path cost, while mean/P95 on a few hops (T4→T5, T6→T7, T10→T11, T12→T1) are inflated by two to three orders of magnitude — this reflects generic Linux scheduling delay on non-core-pinned consumer threads rather than compute cost.
 
-![Hop latency statistics](https://private-us-east-1.manuscdn.com/sessionFile/IgK1A9rOf2Uz1VltnN0bCm/sandbox/qTQ8I9Y8sL12DOE9Jy45oV-images_1793074021092_na1fn_L2hvbWUvdWJ1bnR1L1RyYWRpbmdfU3lzdGVtX0J5X0NQUF9sYXRlc3QvVHJhZGluZ19FY29zeXN0ZW1fRGVzaWduX092ZXJ2aWV3L2ltZy9iZW5jaG1hcmsvaG9wX3N0YXRpc3RpY3M.png?Expires=1793246823&Signature=MEQCIB-T4160Or5pFKKcZctf-O6N5MluaEpT13KZNZyYk9gDAiA6XEzKtpxs23IRtuXpckL7ztMEyyRMGs29BF7Ru4rsPg__&Key-Pair-Id=K1K5N5YNBUUMMN)
+![Hop latency statistics](Trading_Ecosystem_Design_Overview/img/benchmark/hop_statistics.png)
 
 Full methodology, raw data, and engineering takeaways (including what's needed to push this toward production-grade latency — core pinning, kernel bypass, backpressure handling) are documented in [`Low_Latency_CPP_T1_T12_Hop_Report.md`](Trading_Ecosystem_Design_Overview/Low_Latency_CPP_T1_T12_Hop_Report.md).
 
